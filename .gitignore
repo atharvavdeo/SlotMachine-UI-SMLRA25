@@ -1,0 +1,18 @@
+# Ignore backend and other non-frontend files
+backend/
+*.pdf
+*.jpeg
+*.jpg
+*.png
+*.md
+test_*.sh
+check_dependencies.py
+camera-test.html
+test_output_meme.png
+
+# Keep frontend files
+!frontend/
+
+# Standard ignores
+.DS_Store
+Thumbs.db

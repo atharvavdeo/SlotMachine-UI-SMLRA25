@@ -251,6 +251,72 @@ async def get_final_meme():
     )
 
 
+@app.post("/api/process-image")
+async def process_image_api(file: UploadFile = File(...)):
+    """
+    Frontend-compatible endpoint: Upload image → Detect emotion → Return meme image directly.
+    This endpoint returns the meme image file with emotion metadata in headers.
+    
+    Args:
+        file: Image file with face
+    
+    Returns:
+        FileResponse with meme image and emotion metadata in headers
+    """
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    temp_file = None
+    try:
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+        
+        # Stage 1: Detect emotion
+        emotion_result = emotion_detector.detect_emotion(temp_path)
+        
+        if not emotion_result['success']:
+            raise HTTPException(status_code=500, detail=f"Emotion detection failed: {emotion_result['message']}")
+        
+        detected_emotion = emotion_result['emotion']
+        confidence = emotion_result['confidence']
+        
+        # Stage 2: Select and output meme
+        meme_result = select_and_output_meme(detected_emotion)
+        
+        if not meme_result['success']:
+            raise HTTPException(status_code=500, detail=f"Meme selection failed: {meme_result['message']}")
+        
+        # Clean up temp file
+        Path(temp_path).unlink()
+        
+        # Return the meme image with metadata in headers
+        output_path = Path(meme_result['output_path'])
+        
+        return FileResponse(
+            output_path,
+            media_type="image/png",
+            headers={
+                "X-Detected-Emotion": detected_emotion,
+                "X-Confidence": str(confidence),
+                "X-Meme-Filename": meme_result['meme_filename']
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Clean up on error
+        if temp_file:
+            try:
+                Path(temp_path).unlink()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
