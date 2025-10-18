@@ -1,1 +1,0 @@
-# Legacy meme generation endpoint
